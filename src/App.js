@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "firebase/auth";
-import { collection, addDoc, doc, setDoc, getDoc, getDocs, query, orderBy, onSnapshot, serverTimestamp, where } from "firebase/firestore";
+import { collection, addDoc, doc, setDoc, getDoc, getDocs, query, orderBy, onSnapshot, serverTimestamp, where, updateDoc, arrayUnion, arrayRemove, increment } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 const C = {
@@ -216,10 +216,27 @@ const Auth=({onLogin})=>{
   );
 };
 
-const PostCard=({post,onMessage,onOpen})=>{
+const PostCard=({post,currentUser,onMessage,onOpen})=>{
   const mode=MODE_META[post.mode]||MODE_META.swap;
-  const [liked,setLiked]=useState(false);
+  const [liked,setLiked]=useState(post.likedBy?.includes(currentUser.uid)||false);
   const [likeCount,setLikeCount]=useState(post.likes||0);
+  
+  const toggleLike=async(e)=>{
+    e.stopPropagation();
+    const newLiked=!liked;
+    setLiked(newLiked);
+    setLikeCount(c=>newLiked?c+1:c-1);
+    try{
+      await updateDoc(doc(db,"posts",post.id),{
+        likedBy:newLiked?arrayUnion(currentUser.uid):arrayRemove(currentUser.uid),
+        likes:increment(newLiked?1:-1)
+      });
+    }catch(e){
+      setLiked(!newLiked);
+      setLikeCount(c=>newLiked?c-1:c+1);
+    }
+  };
+  
   return(
     <div className="card fadeUp" onClick={()=>onOpen(post)} style={{background:"#fff",borderRadius:18,border:`1.5px solid ${C.border}`,padding:18,marginBottom:14,cursor:"pointer",boxShadow:`0 2px 12px ${C.shadow}`}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
@@ -242,7 +259,7 @@ const PostCard=({post,onMessage,onOpen})=>{
         </div>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
-        <button onClick={e=>{e.stopPropagation();setLiked(!liked);setLikeCount(c=>liked?c-1:c+1);}} style={{background:liked?"#FDE8EA":C.cream,border:`1px solid ${liked?"#F5A8AD":C.border}`,borderRadius:20,padding:"5px 12px",fontSize:12,color:liked?C.rose:C.mist,cursor:"pointer",fontWeight:700,transition:"all 0.15s"}}>❤️ {likeCount}</button>
+        <button onClick={toggleLike} style={{background:liked?"#FDE8EA":C.cream,border:`1px solid ${liked?"#F5A8AD":C.border}`,borderRadius:20,padding:"5px 12px",fontSize:12,color:liked?C.rose:C.mist,cursor:"pointer",fontWeight:700,transition:"all 0.15s"}}>❤️ {likeCount}</button>
         <button onClick={e=>{e.stopPropagation();onMessage({uid:post.authorId,name:post.authorName});}} style={{background:C.pale,border:`1px solid ${C.mint}`,borderRadius:20,padding:"5px 14px",fontSize:12,color:C.green,cursor:"pointer",fontWeight:700}}>💬 Message</button>
         {post.responses>0&&<span style={{marginLeft:"auto",fontSize:12,color:C.mid,fontWeight:700}}>🔗 {post.responses} responses</span>}
       </div>
@@ -258,6 +275,7 @@ const Home=({currentUser,onMessage})=>{
   const [mode,setMode]=useState("all");
   const [ptype,setPtype]=useState("All");
   const [open,setOpen]=useState(null);
+  
   useEffect(()=>{
     const q=query(collection(db,"posts"),orderBy("createdAt","desc"));
     const unsub=onSnapshot(q,snap=>{
@@ -272,6 +290,7 @@ const Home=({currentUser,onMessage})=>{
     });
     return()=>unsub();
   },[]);
+  
   const filtered=posts.filter(p=>{
     if(cat!=="All"&&p.category!==cat)return false;
     if(mode!=="all"&&p.mode!==mode)return false;
@@ -279,7 +298,9 @@ const Home=({currentUser,onMessage})=>{
     if(search){const q=search.toLowerCase();return p.title?.toLowerCase().includes(q)||p.desc?.toLowerCase().includes(q);}
     return true;
   });
+  
   const urgent=posts.filter(p=>p.urgent);
+  
   return(
     <div style={{paddingBottom:90}}>
       <div style={{background:`linear-gradient(155deg,${C.forest} 0%,${C.green} 65%,${C.mid} 100%)`,borderRadius:"0 0 28px 28px",padding:"22px 18px 28px",marginBottom:16}}>
@@ -336,7 +357,7 @@ const Home=({currentUser,onMessage})=>{
           </div>
         ):filtered.map((post,i)=>(
           <div key={post.id} style={{animationDelay:`${i*0.05}s`}}>
-            <PostCard post={post} onMessage={onMessage} onOpen={setOpen}/>
+            <PostCard post={post} currentUser={currentUser} onMessage={onMessage} onOpen={setOpen}/>
           </div>
         ))}
       </div>
@@ -384,6 +405,7 @@ const Create=({currentUser})=>{
   const [loading,setLoading]=useState(false);
   const [done,setDone]=useState(false);
   const [err,setErr]=useState("");
+  
   const publish=async()=>{
     if(!title.trim()){setErr("Please add a title.");return;}
     if(desc.trim().length<20){setErr("Description must be at least 20 characters.");return;}
@@ -395,7 +417,7 @@ const Create=({currentUser})=>{
         location:loc.trim(),urgent:mode==="emergency"?urgent:false,
         emoji:EMOJIS[cat]||"📦",
         authorId:currentUser.uid,authorName:currentUser.displayName||"Anonymous",
-        likes:0,responses:0,verified:false,
+        likes:0,likedBy:[],responses:0,verified:false,
         tags:title.trim().toLowerCase().split(" ").filter(w=>w.length>3).slice(0,4),
         createdAt:serverTimestamp(),
       });
@@ -403,6 +425,7 @@ const Create=({currentUser})=>{
     }catch(e){setErr("Failed to publish. Check your connection.");}
     setLoading(false);
   };
+  
   if(done)return(
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"80vh",textAlign:"center",padding:32}}>
       <div style={{fontSize:80,marginBottom:20}}>🎉</div>
@@ -411,6 +434,7 @@ const Create=({currentUser})=>{
       <Btn onClick={()=>{setDone(false);setTitle("");setDesc("");setMode("swap");setType("HAVE");setUrgent(false);}}>Create Another Post</Btn>
     </div>
   );
+  
   return(
     <div style={{padding:"18px 18px 100px"}}>
       <h2 style={{fontFamily:DISPLAY,fontSize:22,fontWeight:800,color:C.forest,marginBottom:3}}>Create a Post</h2>
@@ -469,13 +493,16 @@ const Messages=({currentUser,activeChat,setActiveChat})=>{
   const [loading,setLoading]=useState(true);
   const endRef=useRef(null);
   const chatId=activeChat?[currentUser.uid,activeChat.uid].sort().join("_"):null;
+  
   useEffect(()=>{
     if(!activeChat||!chatId)return;
     const q=query(collection(db,"chats",chatId,"messages"),orderBy("createdAt","asc"));
     const unsub=onSnapshot(q,snap=>{setMsgs(snap.docs.map(d=>({id:d.id,...d.data()})));});
     return()=>unsub();
   },[chatId,activeChat]);
+  
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
+  
   useEffect(()=>{
     const load=async()=>{
       try{
@@ -486,14 +513,23 @@ const Messages=({currentUser,activeChat,setActiveChat})=>{
     };
     if(!activeChat)load();
   },[activeChat,currentUser.uid]);
+  
   const send=async()=>{
     if(!input.trim()||!activeChat||!chatId)return;
     const text=input.trim();setInput("");
     try{
-      await addDoc(collection(db,"chats",chatId,"messages"),{text,from:currentUser.uid,fromName:currentUser.displayName||"You",to:activeChat.uid,createdAt:serverTimestamp()});
-      await setDoc(doc(db,"chats",chatId),{participants:[currentUser.uid,activeChat.uid],participantNames:{[currentUser.uid]:currentUser.displayName,[activeChat.uid]:activeChat.name},lastMessage:text,lastMessageTime:serverTimestamp()},{merge:true});
+      await addDoc(collection(db,"chats",chatId,"messages"),{
+        text,from:currentUser.uid,fromName:currentUser.displayName||"You",
+        to:activeChat.uid,createdAt:serverTimestamp(),
+      });
+      await setDoc(doc(db,"chats",chatId),{
+        participants:[currentUser.uid,activeChat.uid],
+        participantNames:{[currentUser.uid]:currentUser.displayName,[activeChat.uid]:activeChat.name},
+        lastMessage:text,lastMessageTime:serverTimestamp(),
+      },{merge:true});
     }catch(e){setInput(text);}
   };
+  
   if(activeChat)return(
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 64px)"}}>
       <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12,background:"#fff",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -528,6 +564,7 @@ const Messages=({currentUser,activeChat,setActiveChat})=>{
       </div>
     </div>
   );
+  
   return(
     <div style={{paddingBottom:90}}>
       <div style={{padding:"18px 18px 12px",borderBottom:`1px solid ${C.border}`,background:"#fff"}}>
@@ -558,16 +595,51 @@ const Messages=({currentUser,activeChat,setActiveChat})=>{
   );
 };
 
+const SettingsPage=({onBack,currentUser})=>{
+  const [notif,setNotif]=useState(true);
+  const [loc,setLoc]=useState(true);
+  const [msg,setMsg]=useState("");
+  
+  return(
+    <div style={{paddingBottom:90}}>
+      <div style={{padding:"18px 18px 12px",borderBottom:`1px solid ${C.border}`,background:"#fff",display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={onBack} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:C.mist}}>←</button>
+        <div><h2 style={{fontFamily:DISPLAY,fontSize:22,fontWeight:800,color:C.forest}}>Settings</h2></div>
+      </div>
+      <div style={{padding:"18px"}}>
+        {msg&&<Alert type="success" msg={msg}/>}
+        <div style={{background:"#fff",borderRadius:16,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
+          <h3 style={{fontWeight:800,fontSize:16,marginBottom:14,color:C.forest}}>Notifications</h3>
+          <label style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:12}}>
+            <div><div style={{fontWeight:700,fontSize:14,color:C.ink,marginBottom:2}}>Push Notifications</div><div style={{fontSize:12,color:C.mist}}>Get alerts for matches and messages</div></div>
+            <input type="checkbox" checked={notif} onChange={e=>setNotif(e.target.checked)} style={{width:20,height:20}}/>
+          </label>
+        </div>
+        <div style={{background:"#fff",borderRadius:16,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
+          <h3 style={{fontWeight:800,fontSize:16,marginBottom:14,color:C.forest}}>Location</h3>
+          <label style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:12}}>
+            <div><div style={{fontWeight:700,fontSize:14,color:C.ink,marginBottom:2}}>Location Services</div><div style={{fontSize:12,color:C.mist}}>Show nearby posts and users</div></div>
+            <input type="checkbox" checked={loc} onChange={e=>setLoc(e.target.checked)} style={{width:20,height:20}}/>
+          </label>
+        </div>
+        <Btn onClick={()=>setMsg("Settings saved!")} full>Save Settings</Btn>
+      </div>
+    </div>
+  );
+};
+
 const Profile=({currentUser,onLogout})=>{
   const [profile,setProfile]=useState(null);
   const [tab,setTab]=useState("about");
   const [editing,setEditing]=useState(false);
+  const [showSettings,setShowSettings]=useState(false);
   const [name,setName]=useState("");
   const [bio,setBio]=useState("");
   const [location,setLocation]=useState("");
   const [saving,setSaving]=useState(false);
   const [posts,setPosts]=useState([]);
   const [msg,setMsg]=useState("");
+  
   useEffect(()=>{
     const load=async()=>{
       try{
@@ -581,6 +653,7 @@ const Profile=({currentUser,onLogout})=>{
     };
     load();
   },[currentUser]);
+  
   const save=async()=>{
     setSaving(true);
     try{
@@ -591,7 +664,11 @@ const Profile=({currentUser,onLogout})=>{
     }catch(e){setMsg("Failed to save.");}
     setSaving(false);
   };
+  
   const logout=async()=>{try{await signOut(auth);onLogout();}catch(e){}};
+  
+  if(showSettings)return <SettingsPage onBack={()=>setShowSettings(false)} currentUser={currentUser}/>;
+  
   return(
     <div style={{paddingBottom:100}}>
       <div style={{background:`linear-gradient(155deg,${C.forest} 0%,${C.green} 100%)`,padding:"24px 18px 38px"}}>
@@ -614,12 +691,7 @@ const Profile=({currentUser,onLogout})=>{
         ))}
       </div>
       <div style={{padding:"0 15px"}}>
-        <Alert type={msg.includes("saved")?"success":"error"} msg={msg}/>
-        <div style={{background:`linear-gradient(135deg,#1a0533,#3d1260)`,borderRadius:16,padding:18,marginBottom:16}}>
-          <div style={{fontWeight:800,color:"#fff",fontSize:15,marginBottom:4}}>⚡ Exvora Premium</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",marginBottom:12,lineHeight:1.6}}>Boost your posts · Priority matching · Verified badge</div>
-          <Btn style={{background:"#C8A2F8",color:"#1a0533",fontSize:13,padding:"8px 16px"}}>Upgrade — ₦500/week →</Btn>
-        </div>
+        {msg&&<Alert type={msg.includes("saved")?"success":"error"} msg={msg}/>}
         <div style={{display:"flex",background:C.cream,borderRadius:12,padding:4,marginBottom:16}}>
           {["about","posts","settings"].map(t=>(
             <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"8px",borderRadius:10,border:"none",background:tab===t?C.forest:"transparent",color:tab===t?"#fff":C.mist,fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"capitalize"}}>{t}</button>
@@ -667,10 +739,10 @@ const Profile=({currentUser,onLogout})=>{
             </div>
           </div>
         );}))}
-        {tab==="settings"&&[{icon:"🔔",label:"Push Notifications",desc:"Alerts for matches and messages"},{icon:"📍",label:"Location Services",desc:"Show nearby posts and users"},{icon:"🔒",label:"Privacy Settings",desc:"Control your visibility"},{icon:"💳",label:"Premium & Payments",desc:"Manage subscription"},{icon:"🚩",label:"Report a User",desc:"Keep community safe"},{icon:"📞",label:"Help & Support",desc:"Contact Exvora team"}].map(s=>(
-          <div key={s.label} className="card" style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,padding:"13px 15px",marginBottom:10,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+        {tab==="settings"&&[{icon:"🔔",label:"Notifications & Alerts",action:()=>setShowSettings(true)},{icon:"📍",label:"Location Services",action:()=>setShowSettings(true)},{icon:"🔒",label:"Privacy Settings",action:()=>setShowSettings(true)},{icon:"🚩",label:"Report a User",action:()=>{}},{icon:"📞",label:"Help & Support",action:()=>{}}].map(s=>(
+          <div key={s.label} className="card" onClick={s.action} style={{background:"#fff",borderRadius:14,border:`1px solid ${C.border}`,padding:"13px 15px",marginBottom:10,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
             <div style={{width:38,height:38,borderRadius:12,background:C.cream,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{s.icon}</div>
-            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:C.ink}}>{s.label}</div><div style={{fontSize:12,color:C.mist,marginTop:2}}>{s.desc}</div></div>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:C.ink}}>{s.label}</div></div>
             <span style={{color:C.fog,fontSize:20}}>›</span>
           </div>
         ))}
@@ -703,12 +775,15 @@ export default function App(){
   const [currentUser,setCurrentUser]=useState(null);
   const [activeChat,setActiveChat]=useState(null);
   const [authReady,setAuthReady]=useState(false);
+  
   useEffect(()=>{
     const unsub=onAuthStateChanged(auth,user=>{setCurrentUser(user);setAuthReady(true);});
     return()=>unsub();
   },[]);
+  
   const handleMessage=useCallback(user=>{setActiveChat(user);setTab("messages");},[]);
   const handleTab=useCallback(t=>{if(t!=="messages")setActiveChat(null);setTab(t);},[]);
+  
   return(
     <>
       <GS/>
