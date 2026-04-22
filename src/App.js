@@ -42,6 +42,7 @@ const Icon=({name,size=24,color})=>{
     flag:"M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9",
     phone:"M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z",
     fire:"M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z",
+    camera:"M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z",
   };
   return(
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color||"currentColor"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -56,6 +57,7 @@ const GS=({theme})=>(
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
     body{background:${theme.bg};font-family:${FONT};color:${theme.text};overflow-x:hidden;-webkit-font-smoothing:antialiased;}
     input,textarea,button{font-family:${FONT};}
+    input,textarea{-webkit-appearance:none;-moz-appearance:none;appearance:none;}
     ::-webkit-scrollbar{width:0;}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
@@ -76,14 +78,14 @@ const Btn=({children,onClick,variant="primary",full,icon,loading,disabled,theme,
   );
 };
 
-const Inp=({label,type="text",value,onChange,placeholder,icon,multiline,rows=4,theme})=>(
+const Inp=({label,type="text",value,onChange,placeholder,icon,multiline,rows=4,theme,autoFocus})=>(
   <div style={{marginBottom:16}}>
     {label&&<label style={{display:"block",fontSize:14,fontWeight:600,color:theme.textSec,marginBottom:8}}>{label}</label>}
     <div style={{position:"relative"}}>
       {icon&&<div style={{position:"absolute",left:16,top:multiline?"16px":"50%",transform:multiline?"none":"translateY(-50%)",pointerEvents:"none"}}><Icon name={icon} size={20} color={theme.textTer}/></div>}
       {multiline
-        ?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{width:"100%",padding:icon?"14px 16px 14px 48px":"14px 16px",borderRadius:12,border:`2px solid ${theme.border}`,fontSize:16,color:theme.text,background:theme.surface,outline:"none",resize:"vertical"}}/>
-        :<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:"100%",padding:icon?"14px 16px 14px 48px":"14px 16px",borderRadius:12,border:`2px solid ${theme.border}`,fontSize:16,color:theme.text,background:theme.surface,outline:"none"}}/>
+        ?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} autoFocus={autoFocus} style={{width:"100%",padding:icon?"14px 16px 14px 48px":"14px 16px",borderRadius:12,border:`2px solid ${theme.border}`,fontSize:16,color:theme.text,background:theme.surface,outline:"none",resize:"vertical",WebkitAppearance:"none"}}/>
+        :<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} autoFocus={autoFocus} style={{width:"100%",padding:icon?"14px 16px 14px 48px":"14px 16px",borderRadius:12,border:`2px solid ${theme.border}`,fontSize:16,color:theme.text,background:theme.surface,outline:"none",WebkitAppearance:"none"}}/>
       }
     </div>
   </div>
@@ -134,7 +136,7 @@ const Auth=({onLogin,theme})=>{
       }else{
         const cred=await createUserWithEmailAndPassword(auth,email,pass);
         await updateProfile(cred.user,{displayName:name.trim()});
-        await setDoc(doc(db,"users",cred.user.uid),{name:name.trim(),email,bio:"",location:"",followers:[],following:[],verified:false,theme:"dark",settings:{notifications:true,location:true,privacy:"public"},createdAt:serverTimestamp()});
+        await setDoc(doc(db,"users",cred.user.uid),{name:name.trim(),email,bio:"",location:"",photoURL:"",followers:[],following:[],verified:false,theme:"dark",settings:{notifications:true,location:true,privacy:"public"},createdAt:serverTimestamp()});
         onLogin(cred.user);
       }
     }catch(e){
@@ -261,7 +263,7 @@ const Home=({currentUser,onMessage,theme})=>{
         <h2 style={{fontSize:24,fontWeight:900,color:theme.text,marginBottom:14}}>Community Feed</h2>
         <div style={{position:"relative",marginBottom:12}}>
           <div style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)"}}><Icon name="search" size={20} color={theme.textTer}/></div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search posts..." style={{width:"100%",padding:"12px 16px 12px 48px",borderRadius:12,border:`1px solid ${theme.border}`,fontSize:15,background:theme.card,color:theme.text,outline:"none"}}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search posts..." style={{width:"100%",padding:"12px 16px 12px 48px",borderRadius:12,border:`1px solid ${theme.border}`,fontSize:15,background:theme.card,color:theme.text,outline:"none",WebkitAppearance:"none"}}/>
         </div>
         <div style={{display:"flex",gap:8,marginBottom:10,overflowX:"auto"}}>
           {[{key:"all",label:"All"},{key:"swap",label:"Swap"},{key:"kindness",label:"Kindness"},{key:"emergency",label:"Emergency"},{key:"shelter",label:"Shelter"}].map(m=>(
@@ -377,6 +379,7 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
   const [threads,setThreads]=useState([]);
   const [loading,setLoading]=useState(true);
   const endRef=useRef(null);
+  const inputRef=useRef(null);
   const chatId=activeChat?[currentUser.uid,activeChat.uid].sort().join("_"):null;
   
   useEffect(()=>{
@@ -401,7 +404,8 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
   
   const send=async()=>{
     if(!input.trim()||!activeChat||!chatId)return;
-    const text=input.trim();setInput("");
+    const text=input.trim();
+    setInput("");
     try{
       await addDoc(collection(db,"chats",chatId,"messages"),{
         text,from:currentUser.uid,fromName:currentUser.displayName||"You",
@@ -438,9 +442,17 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
         })}
         <div ref={endRef}/>
       </div>
-      <div style={{background:theme.surface,borderTop:`1px solid ${theme.border}`,padding:16,display:"flex",gap:12}}>
-        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} placeholder="Type a message..." style={{flex:1,padding:"14px 18px",borderRadius:24,border:`1px solid ${theme.border}`,fontSize:16,background:theme.card,color:theme.text,outline:"none"}}/>
-        <button onClick={send} disabled={!input.trim()} style={{width:52,height:52,borderRadius:"50%",background:input.trim()?theme.primary:theme.card,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"not-allowed"}}><Icon name="send" size={22} color={input.trim()?"#FFF":theme.textTer}/></button>
+      <div style={{background:theme.surface,borderTop:`1px solid ${theme.border}`,padding:12,display:"flex",gap:10,alignItems:"flex-end"}}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={e=>setInput(e.target.value)}
+          onKeyPress={e=>e.key==="Enter"&&send()}
+          placeholder="Type a message..."
+          style={{flex:1,padding:"14px 18px",borderRadius:24,border:`2px solid ${theme.border}`,fontSize:16,background:theme.card,color:theme.text,outline:"none",minHeight:50,maxHeight:120,resize:"none",WebkitAppearance:"none"}}
+        />
+        <button onClick={send} disabled={!input.trim()} style={{width:50,height:50,borderRadius:"50%",background:input.trim()?theme.primary:theme.card,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"not-allowed",flexShrink:0}}><Icon name="send" size={22} color={input.trim()?"#FFF":theme.textTer}/></button>
       </div>
     </div>
   );
@@ -649,7 +661,7 @@ const UserCard=({user,currentUser,onFollow,theme})=>{
       </div>
       <div style={{flex:1}}>
         <div style={{fontSize:16,fontWeight:700,color:theme.text}}>{user.name}</div>
-        <div style={{fontSize:13,color:theme.textTer}}>{user.followers?.length||0} followers</div>
+        <div style={{fontSize:13,color:theme.textTer}}>{user.location||"Exvora member"} · {user.followers?.length||0} followers</div>
       </div>
       {user.id!==currentUser.uid&&(
         <button onClick={toggleFollow} style={{background:following?"transparent":theme.primary,color:following?theme.primary:"#FFF",border:following?`2px solid ${theme.primary}`:"none",borderRadius:20,padding:"8px 16px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
@@ -660,10 +672,61 @@ const UserCard=({user,currentUser,onFollow,theme})=>{
   );
 };
 
+const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
+  const [name,setName]=useState("");
+  const [bio,setBio]=useState("");
+  const [location,setLocation]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [msg,setMsg]=useState("");
+  
+  useEffect(()=>{
+    const load=async()=>{
+      const snap=await getDoc(doc(db,"users",currentUser.uid));
+      if(snap.exists()){
+        const d=snap.data();
+        setName(d.name||currentUser.displayName||"");
+        setBio(d.bio||"");
+        setLocation(d.location||"");
+      }
+    };
+    load();
+  },[currentUser]);
+  
+  const save=async()=>{
+    if(!name.trim())return;
+    setLoading(true);
+    try{
+      await updateDoc(doc(db,"users",currentUser.uid),{name:name.trim(),bio:bio.trim(),location:location.trim()});
+      await updateProfile(currentUser,{displayName:name.trim()});
+      onUpdate();
+      setMsg("Profile updated!");
+      setTimeout(()=>onBack(),1500);
+    }catch(e){setMsg("Failed to save");}
+    setLoading(false);
+  };
+  
+  return(
+    <div style={{paddingBottom:100}}>
+      <div style={{background:theme.surface,borderBottom:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer"}}><Icon name="arrowLeft" size={24} color={theme.text}/></button>
+        <h2 style={{fontSize:20,fontWeight:900,color:theme.text}}>Edit Profile</h2>
+      </div>
+      <div style={{padding:16}}>
+        <Alert type="success" msg={msg} theme={theme}/>
+        <Inp label="Name" value={name} onChange={setName} placeholder="Your full name" icon="user" theme={theme}/>
+        <Inp label="Bio" value={bio} onChange={setBio} placeholder="Tell people about yourself..." multiline rows={4} theme={theme}/>
+        <Inp label="Location" value={location} onChange={setLocation} placeholder="Your city/area" icon="fire" theme={theme}/>
+        <Btn onClick={save} full loading={loading} icon="check" theme={theme}>Save Changes</Btn>
+      </div>
+    </div>
+  );
+};
+
 const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
   const [view,setView]=useState("main");
   const [profile,setProfile]=useState(null);
   const [users,setUsers]=useState([]);
+  const [refreshKey,setRefreshKey]=useState(0);
   
   useEffect(()=>{
     const load=async()=>{
@@ -673,7 +736,7 @@ const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
       setUsers(usersSnap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>u.id!==currentUser.uid));
     };
     load();
-  },[currentUser]);
+  },[currentUser,refreshKey]);
   
   const onFollow=async(userId,follow)=>{
     try{
@@ -683,6 +746,7 @@ const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
       await updateDoc(doc(db,"users",currentUser.uid),{
         following:follow?arrayUnion(userId):arrayRemove(userId)
       });
+      setRefreshKey(k=>k+1);
     }catch(e){}
   };
   
@@ -690,6 +754,7 @@ const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
   if(view==="settings")return <SettingsPage onBack={()=>setView("main")} currentUser={currentUser} theme={theme}/>;
   if(view==="report")return <ReportPage onBack={()=>setView("main")} theme={theme}/>;
   if(view==="help")return <HelpPage onBack={()=>setView("main")} theme={theme}/>;
+  if(view==="edit")return <EditProfilePage onBack={()=>setView("main")} currentUser={currentUser} theme={theme} onUpdate={()=>setRefreshKey(k=>k+1)}/>;
   if(view==="users")return(
     <div style={{paddingBottom:100}}>
       <div style={{background:theme.surface,borderBottom:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12}}>
@@ -706,11 +771,12 @@ const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
     <div style={{paddingBottom:100}}>
       <div style={{background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,padding:32,borderRadius:"0 0 32px 32px"}}>
         <div style={{textAlign:"center"}}>
-          <div style={{width:96,height:96,borderRadius:"50%",background:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px"}}>
+          <div style={{width:96,height:96,borderRadius:"50%",background:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px",cursor:"pointer"}} onClick={()=>alert("Profile picture upload coming soon!")}>
             {(currentUser.displayName||"U")[0].toUpperCase()}
           </div>
           <h2 style={{fontSize:24,fontWeight:900,color:"#FFF",marginBottom:8}}>{currentUser.displayName}</h2>
-          <p style={{fontSize:15,color:"rgba(255,255,255,0.8)"}}>{profile?.email||currentUser.email}</p>
+          <p style={{fontSize:15,color:"rgba(255,255,255,0.8)",marginBottom:4}}>{profile?.location||"Location not set"}</p>
+          {profile?.bio&&<p style={{fontSize:14,color:"rgba(255,255,255,0.7)",fontStyle:"italic"}}>{profile.bio}</p>}
           <div style={{display:"flex",justifyContent:"center",gap:24,marginTop:20}}>
             <div style={{textAlign:"center"}}>
               <div style={{fontSize:24,fontWeight:900,color:"#FFF"}}>{profile?.followers?.length||0}</div>
@@ -725,6 +791,7 @@ const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
       </div>
       <div style={{padding:16}}>
         {[
+          {icon:"user",label:"Edit Profile",action:()=>setView("edit")},
           {icon:"users",label:"Discover People",action:()=>setView("users")},
           {icon:"palette",label:"Change Theme",action:()=>setView("theme")},
           {icon:"settings",label:"Settings",action:()=>setView("settings")},
