@@ -57,11 +57,9 @@ const GS=({theme})=>(
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
     body{background:${theme.bg};font-family:${FONT};color:${theme.text};overflow-x:hidden;-webkit-font-smoothing:antialiased;}
     input,textarea,button{font-family:${FONT};}
-    input,textarea{-webkit-appearance:none;-moz-appearance:none;appearance:none;}
     ::-webkit-scrollbar{width:0;}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes scaleIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
     @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
     .slideUp{animation:slideUp 0.4s cubic-bezier(0.16,1,0.3,1);}
   `}</style>
@@ -78,14 +76,14 @@ const Btn=({children,onClick,variant="primary",full,icon,loading,disabled,theme,
   );
 };
 
-const Inp=({label,type="text",value,onChange,placeholder,icon,multiline,rows=4,theme,autoFocus})=>(
+const Inp=({label,type="text",value,onChange,placeholder,icon,multiline,rows=4,theme})=>(
   <div style={{marginBottom:16}}>
     {label&&<label style={{display:"block",fontSize:14,fontWeight:600,color:theme.textSec,marginBottom:8}}>{label}</label>}
     <div style={{position:"relative"}}>
-      {icon&&<div style={{position:"absolute",left:16,top:multiline?"16px":"50%",transform:multiline?"none":"translateY(-50%)",pointerEvents:"none"}}><Icon name={icon} size={20} color={theme.textTer}/></div>}
+      {icon&&<div style={{position:"absolute",left:16,top:multiline?"16px":"50%",transform:multiline?"none":"translateY(-50%)",pointerEvents:"none",zIndex:1}}><Icon name={icon} size={20} color={theme.textTer}/></div>}
       {multiline
-        ?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} autoFocus={autoFocus} style={{width:"100%",padding:icon?"14px 16px 14px 48px":"14px 16px",borderRadius:12,border:`2px solid ${theme.border}`,fontSize:16,color:theme.text,background:theme.surface,outline:"none",resize:"vertical",WebkitAppearance:"none"}}/>
-        :<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} autoFocus={autoFocus} style={{width:"100%",padding:icon?"14px 16px 14px 48px":"14px 16px",borderRadius:12,border:`2px solid ${theme.border}`,fontSize:16,color:theme.text,background:theme.surface,outline:"none",WebkitAppearance:"none"}}/>
+        ?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{width:"100%",padding:icon?"14px 16px 14px 48px":"14px 16px",borderRadius:12,border:`2px solid ${theme.border}`,fontSize:16,color:theme.text,background:theme.surface,outline:"none",resize:"vertical"}}/>
+        :<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:"100%",padding:icon?"14px 16px 14px 48px":"14px 16px",borderRadius:12,border:`2px solid ${theme.border}`,fontSize:16,color:theme.text,background:theme.surface,outline:"none"}}/>
       }
     </div>
   </div>
@@ -169,7 +167,7 @@ const Auth=({onLogin,theme})=>{
   );
 };
 
-const PostCard=({post,currentUser,onLike,onMessage,theme})=>{
+const PostCard=({post,currentUser,onLike,onMessage,onViewProfile,theme})=>{
   const [liked,setLiked]=useState(post.likedBy?.includes(currentUser.uid)||false);
   const [likeCount,setLikeCount]=useState(post.likes||0);
   const mode=MODE_META[post.mode]||MODE_META.swap;
@@ -185,11 +183,11 @@ const PostCard=({post,currentUser,onLike,onMessage,theme})=>{
   return(
     <div className="slideUp" style={{background:theme.card,borderRadius:18,border:`1px solid ${theme.border}`,padding:18,marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-        <div style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#FFF"}}>
+        <div onClick={()=>onViewProfile(post.authorId)} style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#FFF",cursor:"pointer"}}>
           {(post.authorName||"U")[0].toUpperCase()}
         </div>
         <div style={{flex:1}}>
-          <div style={{fontSize:15,fontWeight:700,color:theme.text}}>{post.authorName}</div>
+          <div onClick={()=>onViewProfile(post.authorId)} style={{fontSize:15,fontWeight:700,color:theme.text,cursor:"pointer"}}>{post.authorName}</div>
           <div style={{fontSize:13,color:theme.textTer}}>{post.location} · {post.timeAgo}</div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
@@ -215,7 +213,7 @@ const PostCard=({post,currentUser,onLike,onMessage,theme})=>{
   );
 };
 
-const Home=({currentUser,onMessage,theme})=>{
+const Home=({currentUser,onMessage,onViewProfile,theme})=>{
   const [posts,setPosts]=useState([]);
   const [loading,setLoading]=useState(true);
   const [search,setSearch]=useState("");
@@ -262,8 +260,8 @@ const Home=({currentUser,onMessage,theme})=>{
       <div style={{background:theme.surface,borderBottom:`1px solid ${theme.border}`,padding:16,position:"sticky",top:0,zIndex:100}}>
         <h2 style={{fontSize:24,fontWeight:900,color:theme.text,marginBottom:14}}>Community Feed</h2>
         <div style={{position:"relative",marginBottom:12}}>
-          <div style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)"}}><Icon name="search" size={20} color={theme.textTer}/></div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search posts..." style={{width:"100%",padding:"12px 16px 12px 48px",borderRadius:12,border:`1px solid ${theme.border}`,fontSize:15,background:theme.card,color:theme.text,outline:"none",WebkitAppearance:"none"}}/>
+          <div style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",zIndex:1,pointerEvents:"none"}}><Icon name="search" size={20} color={theme.textTer}/></div>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search posts..." style={{width:"100%",padding:"12px 16px 12px 48px",borderRadius:12,border:`1px solid ${theme.border}`,fontSize:15,background:theme.card,color:theme.text,outline:"none"}}/>
         </div>
         <div style={{display:"flex",gap:8,marginBottom:10,overflowX:"auto"}}>
           {[{key:"all",label:"All"},{key:"swap",label:"Swap"},{key:"kindness",label:"Kindness"},{key:"emergency",label:"Emergency"},{key:"shelter",label:"Shelter"}].map(m=>(
@@ -294,7 +292,7 @@ const Home=({currentUser,onMessage,theme})=>{
             <p style={{fontSize:17,fontWeight:600}}>No posts found</p>
             <p style={{fontSize:14,marginTop:8}}>Try different filters or be the first to post!</p>
           </div>
-        ):filtered.map(p=><PostCard key={p.id} post={p} currentUser={currentUser} onLike={onLike} onMessage={onMessage} theme={theme}/>)}
+        ):filtered.map(p=><PostCard key={p.id} post={p} currentUser={currentUser} onLike={onLike} onMessage={onMessage} onViewProfile={onViewProfile} theme={theme}/>)}
       </div>
     </div>
   );
@@ -379,7 +377,6 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
   const [threads,setThreads]=useState([]);
   const [loading,setLoading]=useState(true);
   const endRef=useRef(null);
-  const inputRef=useRef(null);
   const chatId=activeChat?[currentUser.uid,activeChat.uid].sort().join("_"):null;
   
   useEffect(()=>{
@@ -442,18 +439,16 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
         })}
         <div ref={endRef}/>
       </div>
-      <div style={{background:theme.surface,borderTop:`1px solid ${theme.border}`,padding:12,display:"flex",gap:10,alignItems:"flex-end"}}>
+      <form onSubmit={e=>{e.preventDefault();send();}} style={{background:theme.surface,borderTop:`1px solid ${theme.border}`,padding:12,display:"flex",gap:10,alignItems:"center"}}>
         <input
-          ref={inputRef}
           type="text"
           value={input}
           onChange={e=>setInput(e.target.value)}
-          onKeyPress={e=>e.key==="Enter"&&send()}
           placeholder="Type a message..."
-          style={{flex:1,padding:"14px 18px",borderRadius:24,border:`2px solid ${theme.border}`,fontSize:16,background:theme.card,color:theme.text,outline:"none",minHeight:50,maxHeight:120,resize:"none",WebkitAppearance:"none"}}
+          style={{flex:1,padding:14,borderRadius:24,border:`2px solid ${theme.border}`,fontSize:16,background:theme.card,color:theme.text,outline:"none"}}
         />
-        <button onClick={send} disabled={!input.trim()} style={{width:50,height:50,borderRadius:"50%",background:input.trim()?theme.primary:theme.card,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"not-allowed",flexShrink:0}}><Icon name="send" size={22} color={input.trim()?"#FFF":theme.textTer}/></button>
-      </div>
+        <button type="submit" disabled={!input.trim()} style={{width:50,height:50,borderRadius:"50%",background:input.trim()?theme.primary:theme.card,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"not-allowed",flexShrink:0}}><Icon name="send" size={22} color={input.trim()?"#FFF":theme.textTer}/></button>
+      </form>
     </div>
   );
   
@@ -645,7 +640,100 @@ const ThemeSelector=({onBack,currentTheme,onSelect,theme})=>(
   </div>
 );
 
-const UserCard=({user,currentUser,onFollow,theme})=>{
+const UserProfileView=({userId,onBack,currentUser,theme})=>{
+  const [profile,setProfile]=useState(null);
+  const [posts,setPosts]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [following,setFollowing]=useState(false);
+  
+  useEffect(()=>{
+    const load=async()=>{
+      const snap=await getDoc(doc(db,"users",userId));
+      if(snap.exists()){
+        const d=snap.data();
+        setProfile(d);
+        setFollowing(d.followers?.includes(currentUser.uid)||false);
+      }
+      const q=query(collection(db,"posts"),where("authorId","==",userId));
+      const psnap=await getDocs(q);
+      setPosts(psnap.docs.map(d=>({id:d.id,...d.data()})));
+      setLoading(false);
+    };
+    load();
+  },[userId,currentUser]);
+  
+  const toggleFollow=async()=>{
+    const newFollowing=!following;
+    setFollowing(newFollowing);
+    try{
+      await updateDoc(doc(db,"users",userId),{
+        followers:newFollowing?arrayUnion(currentUser.uid):arrayRemove(currentUser.uid)
+      });
+      await updateDoc(doc(db,"users",currentUser.uid),{
+        following:newFollowing?arrayUnion(userId):arrayRemove(userId)
+      });
+    }catch(e){setFollowing(!newFollowing);}
+  };
+  
+  if(loading)return <Loader/>;
+  
+  return(
+    <div style={{paddingBottom:100}}>
+      <div style={{background:theme.surface,borderBottom:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer"}}><Icon name="arrowLeft" size={24} color={theme.text}/></button>
+        <h2 style={{fontSize:20,fontWeight:900,color:theme.text}}>Profile</h2>
+      </div>
+      <div style={{background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,padding:32}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{width:96,height:96,borderRadius:"50%",background:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px"}}>
+            {(profile?.name||"U")[0].toUpperCase()}
+          </div>
+          <h2 style={{fontSize:24,fontWeight:900,color:"#FFF",marginBottom:8}}>{profile?.name}</h2>
+          <p style={{fontSize:15,color:"rgba(255,255,255,0.8)",marginBottom:4}}>{profile?.location||"Location not set"}</p>
+          {profile?.bio&&<p style={{fontSize:14,color:"rgba(255,255,255,0.7)",fontStyle:"italic",marginBottom:16}}>{profile.bio}</p>}
+          <div style={{display:"flex",justifyContent:"center",gap:24,marginBottom:20}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:900,color:"#FFF"}}>{profile?.followers?.length||0}</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Followers</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:900,color:"#FFF"}}>{posts.length}</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Posts</div>
+            </div>
+          </div>
+          {userId!==currentUser.uid&&(
+            <button onClick={toggleFollow} style={{background:following?"transparent":"#FFF",color:following?"#FFF":theme.primary,border:following?"2px solid #FFF":"none",borderRadius:24,padding:"12px 32px",fontSize:16,fontWeight:700,cursor:"pointer"}}>
+              {following?"Following":"Follow"}
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{padding:16}}>
+        <h3 style={{fontSize:18,fontWeight:700,color:theme.text,marginBottom:14}}>Posts</h3>
+        {posts.length===0?(
+          <div style={{textAlign:"center",padding:"40px 20px",color:theme.textTer}}>
+            <div style={{fontSize:48,marginBottom:12}}>📝</div>
+            <p style={{fontSize:15,fontWeight:600}}>No posts yet</p>
+          </div>
+        ):posts.map(p=>{
+          const mode=MODE_META[p.mode]||MODE_META.swap;
+          return(
+            <div key={p.id} style={{background:theme.card,borderRadius:14,border:`1px solid ${theme.border}`,padding:14,marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <span style={{fontSize:11,fontWeight:700,color:mode.color,background:mode.bg,padding:"4px 10px",borderRadius:12}}>{mode.label}</span>
+                <span style={{fontSize:10,fontWeight:700,color:p.type==="HAVE"?theme.success:theme.error,background:p.type==="HAVE"?`${theme.success}15`:`${theme.error}15`,padding:"3px 8px",borderRadius:10}}>{p.type==="HAVE"?"I HAVE":"I NEED"}</span>
+              </div>
+              <h4 style={{fontSize:15,fontWeight:700,color:theme.text,marginBottom:6}}>{p.title}</h4>
+              <p style={{fontSize:13,color:theme.textSec}}>{p.desc}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const UserCard=({user,currentUser,onFollow,onViewProfile,theme})=>{
   const [following,setFollowing]=useState(user.followers?.includes(currentUser.uid)||false);
   
   const toggleFollow=async()=>{
@@ -656,10 +744,10 @@ const UserCard=({user,currentUser,onFollow,theme})=>{
   
   return(
     <div style={{background:theme.card,borderRadius:16,border:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-      <div style={{width:48,height:48,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#FFF"}}>
+      <div onClick={()=>onViewProfile(user.id)} style={{width:48,height:48,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#FFF",cursor:"pointer"}}>
         {(user.name||"U")[0].toUpperCase()}
       </div>
-      <div style={{flex:1}}>
+      <div style={{flex:1}} onClick={()=>onViewProfile(user.id)} style={{cursor:"pointer"}}>
         <div style={{fontSize:16,fontWeight:700,color:theme.text}}>{user.name}</div>
         <div style={{fontSize:13,color:theme.textTer}}>{user.location||"Exvora member"} · {user.followers?.length||0} followers</div>
       </div>
@@ -678,6 +766,7 @@ const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
   const [location,setLocation]=useState("");
   const [loading,setLoading]=useState(false);
   const [msg,setMsg]=useState("");
+  const fileInputRef=useRef(null);
   
   useEffect(()=>{
     const load=async()=>{
@@ -696,177 +785,4 @@ const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
     if(!name.trim())return;
     setLoading(true);
     try{
-      await updateDoc(doc(db,"users",currentUser.uid),{name:name.trim(),bio:bio.trim(),location:location.trim()});
-      await updateProfile(currentUser,{displayName:name.trim()});
-      onUpdate();
-      setMsg("Profile updated!");
-      setTimeout(()=>onBack(),1500);
-    }catch(e){setMsg("Failed to save");}
-    setLoading(false);
-  };
-  
-  return(
-    <div style={{paddingBottom:100}}>
-      <div style={{background:theme.surface,borderBottom:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12}}>
-        <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer"}}><Icon name="arrowLeft" size={24} color={theme.text}/></button>
-        <h2 style={{fontSize:20,fontWeight:900,color:theme.text}}>Edit Profile</h2>
-      </div>
-      <div style={{padding:16}}>
-        <Alert type="success" msg={msg} theme={theme}/>
-        <Inp label="Name" value={name} onChange={setName} placeholder="Your full name" icon="user" theme={theme}/>
-        <Inp label="Bio" value={bio} onChange={setBio} placeholder="Tell people about yourself..." multiline rows={4} theme={theme}/>
-        <Inp label="Location" value={location} onChange={setLocation} placeholder="Your city/area" icon="fire" theme={theme}/>
-        <Btn onClick={save} full loading={loading} icon="check" theme={theme}>Save Changes</Btn>
-      </div>
-    </div>
-  );
-};
-
-const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
-  const [view,setView]=useState("main");
-  const [profile,setProfile]=useState(null);
-  const [users,setUsers]=useState([]);
-  const [refreshKey,setRefreshKey]=useState(0);
-  
-  useEffect(()=>{
-    const load=async()=>{
-      const snap=await getDoc(doc(db,"users",currentUser.uid));
-      if(snap.exists())setProfile(snap.data());
-      const usersSnap=await getDocs(collection(db,"users"));
-      setUsers(usersSnap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>u.id!==currentUser.uid));
-    };
-    load();
-  },[currentUser,refreshKey]);
-  
-  const onFollow=async(userId,follow)=>{
-    try{
-      await updateDoc(doc(db,"users",userId),{
-        followers:follow?arrayUnion(currentUser.uid):arrayRemove(currentUser.uid)
-      });
-      await updateDoc(doc(db,"users",currentUser.uid),{
-        following:follow?arrayUnion(userId):arrayRemove(userId)
-      });
-      setRefreshKey(k=>k+1);
-    }catch(e){}
-  };
-  
-  if(view==="theme")return <ThemeSelector onBack={()=>setView("main")} currentTheme={profile?.theme||"dark"} onSelect={async(t)=>{await updateDoc(doc(db,"users",currentUser.uid),{theme:t});onThemeChange(t);setView("main");}} theme={theme}/>;
-  if(view==="settings")return <SettingsPage onBack={()=>setView("main")} currentUser={currentUser} theme={theme}/>;
-  if(view==="report")return <ReportPage onBack={()=>setView("main")} theme={theme}/>;
-  if(view==="help")return <HelpPage onBack={()=>setView("main")} theme={theme}/>;
-  if(view==="edit")return <EditProfilePage onBack={()=>setView("main")} currentUser={currentUser} theme={theme} onUpdate={()=>setRefreshKey(k=>k+1)}/>;
-  if(view==="users")return(
-    <div style={{paddingBottom:100}}>
-      <div style={{background:theme.surface,borderBottom:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12}}>
-        <button onClick={()=>setView("main")} style={{background:"none",border:"none",cursor:"pointer"}}><Icon name="arrowLeft" size={24} color={theme.text}/></button>
-        <h2 style={{fontSize:20,fontWeight:900,color:theme.text}}>Discover People</h2>
-      </div>
-      <div style={{padding:16}}>
-        {users.map(u=><UserCard key={u.id} user={u} currentUser={currentUser} onFollow={onFollow} theme={theme}/>)}
-      </div>
-    </div>
-  );
-  
-  return(
-    <div style={{paddingBottom:100}}>
-      <div style={{background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,padding:32,borderRadius:"0 0 32px 32px"}}>
-        <div style={{textAlign:"center"}}>
-          <div style={{width:96,height:96,borderRadius:"50%",background:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px",cursor:"pointer"}} onClick={()=>alert("Profile picture upload coming soon!")}>
-            {(currentUser.displayName||"U")[0].toUpperCase()}
-          </div>
-          <h2 style={{fontSize:24,fontWeight:900,color:"#FFF",marginBottom:8}}>{currentUser.displayName}</h2>
-          <p style={{fontSize:15,color:"rgba(255,255,255,0.8)",marginBottom:4}}>{profile?.location||"Location not set"}</p>
-          {profile?.bio&&<p style={{fontSize:14,color:"rgba(255,255,255,0.7)",fontStyle:"italic"}}>{profile.bio}</p>}
-          <div style={{display:"flex",justifyContent:"center",gap:24,marginTop:20}}>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:24,fontWeight:900,color:"#FFF"}}>{profile?.followers?.length||0}</div>
-              <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Followers</div>
-            </div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:24,fontWeight:900,color:"#FFF"}}>{profile?.following?.length||0}</div>
-              <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Following</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style={{padding:16}}>
-        {[
-          {icon:"user",label:"Edit Profile",action:()=>setView("edit")},
-          {icon:"users",label:"Discover People",action:()=>setView("users")},
-          {icon:"palette",label:"Change Theme",action:()=>setView("theme")},
-          {icon:"settings",label:"Settings",action:()=>setView("settings")},
-          {icon:"flag",label:"Report a User",action:()=>setView("report")},
-          {icon:"phone",label:"Help & Support",action:()=>setView("help")},
-        ].map((item,i)=>(
-          <div key={i} onClick={item.action} className="slideUp" style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:16,padding:18,marginBottom:12,display:"flex",alignItems:"center",gap:14,cursor:"pointer",animationDelay:`${i*0.05}s`}}>
-            <div style={{width:48,height:48,borderRadius:12,background:`${theme.primary}15`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <Icon name={item.icon} size={24} color={theme.primary}/>
-            </div>
-            <div style={{flex:1,fontSize:16,fontWeight:700,color:theme.text}}>{item.label}</div>
-            <Icon name="arrowLeft" size={20} color={theme.textTer} style={{transform:"rotate(180deg)"}}/>
-          </div>
-        ))}
-        <Btn onClick={onLogout} full variant="danger" icon="arrowLeft" theme={theme} style={{marginTop:24}}>Sign Out</Btn>
-      </div>
-    </div>
-  );
-};
-
-const Nav=({tab,setTab,theme})=>{
-  const items=[
-    {key:"home",icon:"home",label:"Home"},
-    {key:"create",icon:"plus",label:"Create"},
-    {key:"messages",icon:"message",label:"Messages"},
-    {key:"profile",icon:"user",label:"Profile"},
-  ];
-  return(
-    <div style={{position:"fixed",bottom:0,left:0,right:0,background:theme.surface,borderTop:`1px solid ${theme.border}`,display:"flex",padding:"8px 0",maxWidth:480,margin:"0 auto",zIndex:1000}}>
-      {items.map(item=>(
-        <button key={item.key} onClick={()=>setTab(item.key)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"6px 0"}}>
-          <Icon name={item.icon} size={24} color={tab===item.key?theme.primary:theme.textTer}/>
-          <span style={{fontSize:11,fontWeight:tab===item.key?700:500,color:tab===item.key?theme.primary:theme.textTer}}>{item.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-};
-
-export default function App(){
-  const [phase,setPhase]=useState("splash");
-  const [tab,setTab]=useState("home");
-  const [currentUser,setCurrentUser]=useState(null);
-  const [activeChat,setActiveChat]=useState(null);
-  const [themeName,setThemeName]=useState("dark");
-  const theme=THEMES[themeName];
-  
-  useEffect(()=>{
-    const unsub=onAuthStateChanged(auth,async user=>{
-      setCurrentUser(user);
-      if(user){
-        const snap=await getDoc(doc(db,"users",user.uid));
-        if(snap.exists()&&snap.data().theme)setThemeName(snap.data().theme);
-        setPhase("app");
-      }
-    });
-    return()=>unsub();
-  },[]);
-  
-  const handleMessage=useCallback(user=>{setActiveChat(user);setTab("messages");},[]);
-  
-  return(
-    <>
-      <GS theme={theme}/>
-      {phase==="splash"&&<Splash onDone={()=>setPhase("auth")}/>}
-      {phase==="auth"&&!currentUser&&<Auth onLogin={u=>{setCurrentUser(u);setPhase("app");}} theme={theme}/>}
-      {currentUser&&(
-        <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:theme.bg}}>
-          {tab==="home"&&<Home currentUser={currentUser} onMessage={handleMessage} theme={theme}/>}
-          {tab==="create"&&<Create currentUser={currentUser} theme={theme}/>}
-          {tab==="messages"&&<Messages currentUser={currentUser} activeChat={activeChat} setActiveChat={setActiveChat} theme={theme}/>}
-          {tab==="profile"&&<Profile currentUser={currentUser} onLogout={()=>{setCurrentUser(null);setPhase("auth");}} theme={theme} onThemeChange={setThemeName}/>}
-          <Nav tab={tab} setTab={setTab} theme={theme}/>
-        </div>
-      )}
-    </>
-  );
-}
+      await updateDoc(doc(db,"users",currentUser.uid),{name:name.trim(),​​​​​​​​​​​​​​​​
