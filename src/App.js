@@ -399,7 +399,8 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
     if(!activeChat)load();
   },[activeChat,currentUser.uid]);
   
-  const send=async()=>{
+  const send=async(e)=>{
+    if(e)e.preventDefault();
     if(!input.trim()||!activeChat||!chatId)return;
     const text=input.trim();
     setInput("");
@@ -413,7 +414,7 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
         participantNames:{[currentUser.uid]:currentUser.displayName,[activeChat.uid]:activeChat.name},
         lastMessage:text,lastMessageTime:serverTimestamp(),
       },{merge:true});
-    }catch(e){setInput(text);}
+    }catch(err){setInput(text);}
   };
   
   if(activeChat)return(
@@ -439,16 +440,18 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
         })}
         <div ref={endRef}/>
       </div>
-      <form onSubmit={e=>{e.preventDefault();send();}} style={{background:theme.surface,borderTop:`1px solid ${theme.border}`,padding:12,display:"flex",gap:10,alignItems:"center"}}>
-        <input
-          type="text"
-          value={input}
-          onChange={e=>setInput(e.target.value)}
-          placeholder="Type a message..."
-          style={{flex:1,padding:14,borderRadius:24,border:`2px solid ${theme.border}`,fontSize:16,background:theme.card,color:theme.text,outline:"none"}}
-        />
-        <button type="submit" disabled={!input.trim()} style={{width:50,height:50,borderRadius:"50%",background:input.trim()?theme.primary:theme.card,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"not-allowed",flexShrink:0}}><Icon name="send" size={22} color={input.trim()?"#FFF":theme.textTer}/></button>
-      </form>
+      <div style={{background:theme.surface,borderTop:`1px solid ${theme.border}`,padding:12}}>
+        <form onSubmit={send} style={{display:"flex",gap:10,alignItems:"center"}}>
+          <input
+            type="text"
+            value={input}
+            onChange={e=>setInput(e.target.value)}
+            placeholder="Type message..."
+            style={{flex:1,padding:14,borderRadius:24,border:`2px solid ${theme.border}`,fontSize:16,background:theme.card,color:theme.text,outline:"none"}}
+          />
+          <button type="submit" disabled={!input.trim()} style={{width:50,height:50,flexShrink:0,borderRadius:"50%",background:input.trim()?theme.primary:theme.card,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"not-allowed"}}><Icon name="send" size={22} color={input.trim()?"#FFF":theme.textTer}/></button>
+        </form>
+      </div>
     </div>
   );
   
@@ -654,7 +657,7 @@ const UserProfileView=({userId,onBack,currentUser,theme})=>{
         setProfile(d);
         setFollowing(d.followers?.includes(currentUser.uid)||false);
       }
-      const q=query(collection(db,"posts"),where("authorId","==",userId));
+      const q=query(collection(db,"posts"),where("authorId","==",userId),orderBy("createdAt","desc"));
       const psnap=await getDocs(q);
       setPosts(psnap.docs.map(d=>({id:d.id,...d.data()})));
       setLoading(false);
@@ -747,7 +750,7 @@ const UserCard=({user,currentUser,onFollow,onViewProfile,theme})=>{
       <div onClick={()=>onViewProfile(user.id)} style={{width:48,height:48,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#FFF",cursor:"pointer"}}>
         {(user.name||"U")[0].toUpperCase()}
       </div>
-      <div style={{flex:1}} onClick={()=>onViewProfile(user.id)} style={{cursor:"pointer"}}>
+      <div style={{flex:1,cursor:"pointer"}} onClick={()=>onViewProfile(user.id)}>
         <div style={{fontSize:16,fontWeight:700,color:theme.text}}>{user.name}</div>
         <div style={{fontSize:13,color:theme.textTer}}>{user.location||"Exvora member"} · {user.followers?.length||0} followers</div>
       </div>
@@ -785,4 +788,207 @@ const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
     if(!name.trim())return;
     setLoading(true);
     try{
-      await updateDoc(doc(db,"users",currentUser.uid),{name:name.trim(),​​​​​​​​​​​​​​​​
+      await updateDoc(doc(db,"users",currentUser.uid),{name:name.trim(),bio:bio.trim(),location:location.trim()});
+      await updateProfile(currentUser,{displayName:name.trim()});
+      onUpdate();
+      setMsg("Profile updated!");
+      setTimeout(()=>onBack(),1500);
+    }catch(e){setMsg("Failed to save");}
+    setLoading(false);
+  };
+  
+  const handlePhotoUpload=()=>{
+    alert("Profile picture upload coming soon! For now, we'll use your first letter.");
+  };
+  
+  return(
+    <div style={{paddingBottom:100}}>
+      <div style={{background:theme.surface,borderBottom:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer"}}><Icon name="arrowLeft" size={24} color={theme.text}/></button>
+        <h2 style={{fontSize:20,fontWeight:900,color:theme.text}}>Edit Profile</h2>
+      </div>
+      <div style={{padding:16}}>
+        <Alert type="success" msg={msg} theme={theme}/>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{position:"relative",display:"inline-block"}}>
+            <div style={{width:96,height:96,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:"#FFF"}}>
+              {(name||currentUser.displayName||"U")[0].toUpperCase()}
+            </div>
+            <button onClick={handlePhotoUpload} style={{position:"absolute",bottom:0,right:0,width:32,height:32,borderRadius:"50%",background:theme.primary,border:`3px solid ${theme.bg}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+              <Icon name="camera" size={18} color="#FFF"/>
+            </button>
+          </div>
+          <p style={{fontSize:13,color:theme.textTer,marginTop:8}}>Tap camera to upload photo</p>
+        </div>
+        <Inp label="Name" value={name} onChange={setName} placeholder="Your full name" icon="user" theme={theme}/>
+        <Inp label="Bio" value={bio} onChange={setBio} placeholder="Tell people about yourself..." multiline rows={4} theme={theme}/>
+        <Inp label="Location" value={location} onChange={setLocation} placeholder="Your city/area" icon="fire" theme={theme}/>
+        <Btn onClick={save} full loading={loading} icon="check" theme={theme}>Save Changes</Btn>
+      </div>
+      <input ref={fileInputRef} type="file" accept="image/*" style={{display:"none"}}/>
+    </div>
+  );
+};
+
+const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
+  const [view,setView]=useState("main");
+  const [viewUserId,setViewUserId]=useState(null);
+  const [profile,setProfile]=useState(null);
+  const [users,setUsers]=useState([]);
+  const [refreshKey,setRefreshKey]=useState(0);
+  
+  useEffect(()=>{
+    const load=async()=>{
+      const snap=await getDoc(doc(db,"users",currentUser.uid));
+      if(snap.exists())setProfile(snap.data());
+      const usersSnap=await getDocs(collection(db,"users"));
+      setUsers(usersSnap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>u.id!==currentUser.uid));
+    };
+    load();
+  },[currentUser,refreshKey]);
+  
+  const onFollow=async(userId,follow)=>{
+    try{
+      await updateDoc(doc(db,"users",userId),{
+        followers:follow?arrayUnion(currentUser.uid):arrayRemove(currentUser.uid)
+      });
+      await updateDoc(doc(db,"users",currentUser.uid),{
+        following:follow?arrayUnion(userId):arrayRemove(userId)
+      });
+      setRefreshKey(k=>k+1);
+    }catch(e){}
+  };
+  
+  const handleViewProfile=(userId)=>{
+    setViewUserId(userId);
+    setView("viewProfile");
+  };
+  
+  if(view==="viewProfile"&&viewUserId)return <UserProfileView userId={viewUserId} onBack={()=>{setView("main");setViewUserId(null);}} currentUser={currentUser} theme={theme}/>;
+  if(view==="theme")return <ThemeSelector onBack={()=>setView("main")} currentTheme={profile?.theme||"dark"} onSelect={async(t)=>{await updateDoc(doc(db,"users",currentUser.uid),{theme:t});onThemeChange(t);setView("main");}} theme={theme}/>;
+  if(view==="settings")return <SettingsPage onBack={()=>setView("main")} currentUser={currentUser} theme={theme}/>;
+  if(view==="report")return <ReportPage onBack={()=>setView("main")} theme={theme}/>;
+  if(view==="help")return <HelpPage onBack={()=>setView("main")} theme={theme}/>;
+  if(view==="edit")return <EditProfilePage onBack={()=>setView("main")} currentUser={currentUser} theme={theme} onUpdate={()=>setRefreshKey(k=>k+1)}/>;
+  if(view==="users")return(
+    <div style={{paddingBottom:100}}>
+      <div style={{background:theme.surface,borderBottom:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={()=>setView("main")} style={{background:"none",border:"none",cursor:"pointer"}}><Icon name="arrowLeft" size={24} color={theme.text}/></button>
+        <h2 style={{fontSize:20,fontWeight:900,color:theme.text}}>Discover People</h2>
+      </div>
+      <div style={{padding:16}}>
+        {users.map(u=><UserCard key={u.id} user={u} currentUser={currentUser} onFollow={onFollow} onViewProfile={handleViewProfile} theme={theme}/>)}
+      </div>
+    </div>
+  );
+  
+  return(
+    <div style={{paddingBottom:100}}>
+      <div style={{background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,padding:32,borderRadius:"0 0 32px 32px"}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{width:96,height:96,borderRadius:"50%",background:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px"}}>
+            {(currentUser.displayName||"U")[0].toUpperCase()}
+          </div>
+          <h2 style={{fontSize:24,fontWeight:900,color:"#FFF",marginBottom:8}}>{currentUser.displayName}</h2>
+          <p style={{fontSize:15,color:"rgba(255,255,255,0.8)",marginBottom:4}}>{profile?.location||"Location not set"}</p>
+          {profile?.bio&&<p style={{fontSize:14,color:"rgba(255,255,255,0.7)",fontStyle:"italic"}}>{profile.bio}</p>}
+          <div style={{display:"flex",justifyContent:"center",gap:24,marginTop:20}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:900,color:"#FFF"}}>{profile?.followers?.length||0}</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Followers</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:900,color:"#FFF"}}>{profile?.following?.length||0}</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>Following</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{padding:16}}>
+        {[
+          {icon:"user",label:"Edit Profile",action:()=>setView("edit")},
+          {icon:"users",label:"Discover People",action:()=>setView("users")},
+          {icon:"palette",label:"Change Theme",action:()=>setView("theme")},
+          {icon:"settings",label:"Settings",action:()=>setView("settings")},
+          {icon:"flag",label:"Report a User",action:()=>setView("report")},
+          {icon:"phone",label:"Help & Support",action:()=>setView("help")},
+        ].map((item,i)=>(
+          <div key={i} onClick={item.action} className="slideUp" style={{background:theme.card,border:`1px solid ${theme.border}`,borderRadius:16,padding:18,marginBottom:12,display:"flex",alignItems:"center",gap:14,cursor:"pointer",animationDelay:`${i*0.05}s`}}>
+            <div style={{width:48,height:48,borderRadius:12,background:`${theme.primary}15`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <Icon name={item.icon} size={24} color={theme.primary}/>
+            </div>
+            <div style={{flex:1,fontSize:16,fontWeight:700,color:theme.text}}>{item.label}</div>
+            <Icon name="arrowLeft" size={20} color={theme.textTer} style={{transform:"rotate(180deg)"}}/>
+          </div>
+        ))}
+        <Btn onClick={onLogout} full variant="danger" icon="arrowLeft" theme={theme} style={{marginTop:24}}>Sign Out</Btn>
+      </div>
+    </div>
+  );
+};
+
+const Nav=({tab,setTab,theme})=>{
+  const items=[
+    {key:"home",icon:"home",label:"Home"},
+    {key:"create",icon:"plus",label:"Create"},
+    {key:"messages",icon:"message",label:"Messages"},
+    {key:"profile",icon:"user",label:"Profile"},
+  ];
+  return(
+    <div style={{position:"fixed",bottom:0,left:0,right:0,background:theme.surface,borderTop:`1px solid ${theme.border}`,display:"flex",padding:"8px 0",maxWidth:480,margin:"0 auto",zIndex:1000}}>
+      {items.map(item=>(
+        <button key={item.key} onClick={()=>setTab(item.key)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"6px 0"}}>
+          <Icon name={item.icon} size={24} color={tab===item.key?theme.primary:theme.textTer}/>
+          <span style={{fontSize:11,fontWeight:tab===item.key?700:500,color:tab===item.key?theme.primary:theme.textTer}}>{item.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+export default function App(){
+  const [phase,setPhase]=useState("splash");
+  const [tab,setTab]=useState("home");
+  const [currentUser,setCurrentUser]=useState(null);
+  const [activeChat,setActiveChat]=useState(null);
+  const [themeName,setThemeName]=useState("dark");
+  const theme=THEMES[themeName];
+  
+  useEffect(()=>{
+    const unsub=onAuthStateChanged(auth,async user=>{
+      setCurrentUser(user);
+      if(user){
+        const snap=await getDoc(doc(db,"users",user.uid));
+        if(snap.exists()&&snap.data().theme)setThemeName(snap.data().theme);
+        setPhase("app");
+      }
+    });
+    return()=>unsub();
+  },[]);
+  
+  const handleMessage=useCallback(user=>{setActiveChat(user);setTab("messages");},[]);
+  const handleViewProfile=useCallback(userId=>{
+    setTab("profile");
+    setTimeout(()=>{
+      const profileComponent=document.querySelector('[data-profile-view]');
+      if(profileComponent)profileComponent.click();
+    },100);
+  },[]);
+  
+  return(
+    <>
+      <GS theme={theme}/>
+      {phase==="splash"&&<Splash onDone={()=>setPhase("auth")}/>}
+      {phase==="auth"&&!currentUser&&<Auth onLogin={u=>{setCurrentUser(u);setPhase("app");}} theme={theme}/>}
+      {currentUser&&(
+        <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:theme.bg}}>
+          {tab==="home"&&<Home currentUser={currentUser} onMessage={handleMessage} onViewProfile={handleViewProfile} theme={theme}/>}
+          {tab==="create"&&<Create currentUser={currentUser} theme={theme}/>}
+          {tab==="messages"&&<Messages currentUser={currentUser} activeChat={activeChat} setActiveChat={setActiveChat} theme={theme}/>}
+          {tab==="profile"&&<Profile currentUser={currentUser} onLogout={async()=>{await signOut(auth);setCurrentUser(null);setPhase("auth");}} theme={theme} onThemeChange={setThemeName}/>}
+          <Nav tab={tab} setTab={setTab} theme={theme}/>
+        </div>
+      )}
+    </>
+  );
+}
