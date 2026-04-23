@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "firebase/auth";
 import { collection, addDoc, doc, setDoc, getDoc, getDocs, query, orderBy, onSnapshot, serverTimestamp, where, updateDoc, arrayUnion, arrayRemove, increment } from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, db, storage } from "./firebase";
 
 const THEMES={
   dark:{bg:"#0A0A0A",surface:"#1C1C1E",card:"#2C2C2E",text:"#FFFFFF",textSec:"#EBEBF5",textTer:"#8E8E93",border:"#38383A",primary:"#0A84FF",accent:"#5E5CE6",success:"#30D158",error:"#FF453A"},
@@ -170,7 +171,16 @@ const Auth=({onLogin,theme})=>{
 const PostCard=({post,currentUser,onLike,onMessage,onViewProfile,theme})=>{
   const [liked,setLiked]=useState(post.likedBy?.includes(currentUser.uid)||false);
   const [likeCount,setLikeCount]=useState(post.likes||0);
+  const [userPhoto,setUserPhoto]=useState("");
   const mode=MODE_META[post.mode]||MODE_META.swap;
+  
+  useEffect(()=>{
+    const load=async()=>{
+      const snap=await getDoc(doc(db,"users",post.authorId));
+      if(snap.exists()&&snap.data().photoURL)setUserPhoto(snap.data().photoURL);
+    };
+    load();
+  },[post.authorId]);
   
   const toggleLike=async(e)=>{
     e.stopPropagation();
@@ -183,8 +193,8 @@ const PostCard=({post,currentUser,onLike,onMessage,onViewProfile,theme})=>{
   return(
     <div className="slideUp" style={{background:theme.card,borderRadius:18,border:`1px solid ${theme.border}`,padding:18,marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-        <div onClick={()=>onViewProfile(post.authorId)} style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#FFF",cursor:"pointer"}}>
-          {(post.authorName||"U")[0].toUpperCase()}
+        <div onClick={()=>onViewProfile(post.authorId)} style={{width:44,height:44,borderRadius:"50%",background:userPhoto?`url(${userPhoto}) center/cover`:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#FFF",cursor:"pointer"}}>
+          {!userPhoto&&(post.authorName||"U")[0].toUpperCase()}
         </div>
         <div style={{flex:1}}>
           <div onClick={()=>onViewProfile(post.authorId)} style={{fontSize:15,fontWeight:700,color:theme.text,cursor:"pointer"}}>{post.authorName}</div>
@@ -377,6 +387,7 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
   const [threads,setThreads]=useState([]);
   const [loading,setLoading]=useState(true);
   const endRef=useRef(null);
+  const inputRef=useRef(null);
   const chatId=activeChat?[currentUser.uid,activeChat.uid].sort().join("_"):null;
   
   useEffect(()=>{
@@ -401,8 +412,8 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
   
   const send=async(e)=>{
     if(e)e.preventDefault();
-    if(!input.trim()||!activeChat||!chatId)return;
     const text=input.trim();
+    if(!text||!activeChat||!chatId)return;
     setInput("");
     try{
       await addDoc(collection(db,"chats",chatId,"messages"),{
@@ -414,6 +425,7 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
         participantNames:{[currentUser.uid]:currentUser.displayName,[activeChat.uid]:activeChat.name},
         lastMessage:text,lastMessageTime:serverTimestamp(),
       },{merge:true});
+      inputRef.current?.focus();
     }catch(err){setInput(text);}
   };
   
@@ -440,18 +452,20 @@ const Messages=({currentUser,activeChat,setActiveChat,theme})=>{
         })}
         <div ref={endRef}/>
       </div>
-      <div style={{background:theme.surface,borderTop:`1px solid ${theme.border}`,padding:12}}>
-        <form onSubmit={send} style={{display:"flex",gap:10,alignItems:"center"}}>
+      <form onSubmit={send} style={{background:theme.surface,borderTop:`1px solid ${theme.border}`,padding:"12px 16px"}}>
+        <div style={{display:"flex",gap:10}}>
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={e=>setInput(e.target.value)}
             placeholder="Type message..."
-            style={{flex:1,padding:14,borderRadius:24,border:`2px solid ${theme.border}`,fontSize:16,background:theme.card,color:theme.text,outline:"none"}}
+            autoComplete="off"
+            style={{flex:1,padding:12,borderRadius:20,border:`1px solid ${theme.border}`,fontSize:16,background:theme.card,color:theme.text,outline:"none"}}
           />
-          <button type="submit" disabled={!input.trim()} style={{width:50,height:50,flexShrink:0,borderRadius:"50%",background:input.trim()?theme.primary:theme.card,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"not-allowed"}}><Icon name="send" size={22} color={input.trim()?"#FFF":theme.textTer}/></button>
-        </form>
-      </div>
+          <button type="submit" disabled={!input.trim()} style={{width:44,height:44,flexShrink:0,borderRadius:"50%",background:input.trim()?theme.primary:theme.card,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"not-allowed"}}><Icon name="send" size={20} color={input.trim()?"#FFF":theme.textTer}/></button>
+        </div>
+      </form>
     </div>
   );
   
@@ -500,7 +514,7 @@ const SettingsPage=({onBack,currentUser,theme})=>{
   const save=async()=>{
     try{
       await updateDoc(doc(db,"users",currentUser.uid),{settings});
-      setMsg("Settings saved successfully!");
+      setMsg("Settings saved!");
       setTimeout(()=>setMsg(""),2000);
     }catch(e){setMsg("Failed to save");}
   };
@@ -565,7 +579,7 @@ const ReportPage=({onBack,theme})=>{
         <h2 style={{fontSize:20,fontWeight:900,color:theme.text}}>Report User</h2>
       </div>
       <div style={{padding:16}}>
-        <Alert type="success" msg={success?"Report submitted successfully!":""} theme={theme}/>
+        <Alert type="success" msg={success?"Report submitted!":""} theme={theme}/>
         <div style={{marginBottom:16}}>
           <label style={{display:"block",fontSize:14,fontWeight:600,color:theme.textSec,marginBottom:8}}>Reason</label>
           <select value={reason} onChange={e=>setReason(e.target.value)} style={{width:"100%",padding:14,borderRadius:12,border:`2px solid ${theme.border}`,fontSize:15,background:theme.surface,color:theme.text,outline:"none"}}>
@@ -577,7 +591,7 @@ const ReportPage=({onBack,theme})=>{
             <option value="other">Other</option>
           </select>
         </div>
-        <Inp label="Details" value={details} onChange={setDetails} placeholder="Please describe the issue..." multiline rows={6} theme={theme}/>
+        <Inp label="Details" value={details} onChange={setDetails} placeholder="Describe the issue..." multiline rows={6} theme={theme}/>
         <Btn onClick={submit} full loading={loading} icon="flag" theme={theme}>Submit Report</Btn>
       </div>
     </div>
@@ -610,7 +624,7 @@ const HelpPage=({onBack,theme})=>{
       <div style={{padding:16}}>
         <Alert type="success" msg={success?"Message sent! We'll respond within 24 hours.":""} theme={theme}/>
         <Inp label="Subject" value={subject} onChange={setSubject} placeholder="How can we help?" theme={theme}/>
-        <Inp label="Message" value={message} onChange={setMessage} placeholder="Describe your issue or question..." multiline rows={6} theme={theme}/>
+        <Inp label="Message" value={message} onChange={setMessage} placeholder="Describe your issue..." multiline rows={6} theme={theme}/>
         <Btn onClick={submit} full loading={loading} icon="phone" theme={theme}>Send Message</Btn>
       </div>
     </div>
@@ -688,8 +702,8 @@ const UserProfileView=({userId,onBack,currentUser,theme})=>{
       </div>
       <div style={{background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,padding:32}}>
         <div style={{textAlign:"center"}}>
-          <div style={{width:96,height:96,borderRadius:"50%",background:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px"}}>
-            {(profile?.name||"U")[0].toUpperCase()}
+          <div style={{width:96,height:96,borderRadius:"50%",background:profile?.photoURL?`url(${profile.photoURL}) center/cover`:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px"}}>
+            {!profile?.photoURL&&(profile?.name||"U")[0].toUpperCase()}
           </div>
           <h2 style={{fontSize:24,fontWeight:900,color:"#FFF",marginBottom:8}}>{profile?.name}</h2>
           <p style={{fontSize:15,color:"rgba(255,255,255,0.8)",marginBottom:4}}>{profile?.location||"Location not set"}</p>
@@ -738,6 +752,11 @@ const UserProfileView=({userId,onBack,currentUser,theme})=>{
 
 const UserCard=({user,currentUser,onFollow,onViewProfile,theme})=>{
   const [following,setFollowing]=useState(user.followers?.includes(currentUser.uid)||false);
+  const [userPhoto,setUserPhoto]=useState("");
+  
+  useEffect(()=>{
+    if(user.photoURL)setUserPhoto(user.photoURL);
+  },[user.photoURL]);
   
   const toggleFollow=async()=>{
     const newFollowing=!following;
@@ -747,8 +766,8 @@ const UserCard=({user,currentUser,onFollow,onViewProfile,theme})=>{
   
   return(
     <div style={{background:theme.card,borderRadius:16,border:`1px solid ${theme.border}`,padding:16,display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-      <div onClick={()=>onViewProfile(user.id)} style={{width:48,height:48,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#FFF",cursor:"pointer"}}>
-        {(user.name||"U")[0].toUpperCase()}
+      <div onClick={()=>onViewProfile(user.id)} style={{width:48,height:48,borderRadius:"50%",background:userPhoto?`url(${userPhoto}) center/cover`:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#FFF",cursor:"pointer"}}>
+        {!userPhoto&&(user.name||"U")[0].toUpperCase()}
       </div>
       <div style={{flex:1,cursor:"pointer"}} onClick={()=>onViewProfile(user.id)}>
         <div style={{fontSize:16,fontWeight:700,color:theme.text}}>{user.name}</div>
@@ -768,7 +787,9 @@ const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
   const [bio,setBio]=useState("");
   const [location,setLocation]=useState("");
   const [loading,setLoading]=useState(false);
+  const [uploading,setUploading]=useState(false);
   const [msg,setMsg]=useState("");
+  const [photoURL,setPhotoURL]=useState("");
   const fileInputRef=useRef(null);
   
   useEffect(()=>{
@@ -779,6 +800,7 @@ const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
         setName(d.name||currentUser.displayName||"");
         setBio(d.bio||"");
         setLocation(d.location||"");
+        setPhotoURL(d.photoURL||"");
       }
     };
     load();
@@ -797,8 +819,21 @@ const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
     setLoading(false);
   };
   
-  const handlePhotoUpload=()=>{
-    alert("Profile picture upload coming soon! For now, we'll use your first letter.");
+  const handlePhotoUpload=async(e)=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    if(file.size>5*1024*1024){setMsg("Image too large (max 5MB)");return;}
+    setUploading(true);
+    try{
+      const storageRef=ref(storage,`profiles/${currentUser.uid}/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef,file);
+      const url=await getDownloadURL(storageRef);
+      await updateDoc(doc(db,"users",currentUser.uid),{photoURL:url});
+      setPhotoURL(url);
+      setMsg("Photo uploaded!");
+      setTimeout(()=>setMsg(""),2000);
+    }catch(e){setMsg("Upload failed");}
+    setUploading(false);
   };
   
   return(
@@ -811,11 +846,11 @@ const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
         <Alert type="success" msg={msg} theme={theme}/>
         <div style={{textAlign:"center",marginBottom:24}}>
           <div style={{position:"relative",display:"inline-block"}}>
-            <div style={{width:96,height:96,borderRadius:"50%",background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:"#FFF"}}>
-              {(name||currentUser.displayName||"U")[0].toUpperCase()}
+            <div style={{width:96,height:96,borderRadius:"50%",background:photoURL?`url(${photoURL}) center/cover`:`linear-gradient(135deg,${theme.primary},${theme.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:"#FFF"}}>
+              {!photoURL&&(name||currentUser.displayName||"U")[0].toUpperCase()}
             </div>
-            <button onClick={handlePhotoUpload} style={{position:"absolute",bottom:0,right:0,width:32,height:32,borderRadius:"50%",background:theme.primary,border:`3px solid ${theme.bg}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-              <Icon name="camera" size={18} color="#FFF"/>
+            <button onClick={()=>fileInputRef.current?.click()} disabled={uploading} style={{position:"absolute",bottom:0,right:0,width:32,height:32,borderRadius:"50%",background:theme.primary,border:`3px solid ${theme.bg}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:uploading?"wait":"pointer"}}>
+              {uploading?<div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"#FFF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>:<Icon name="camera" size={18} color="#FFF"/>}
             </button>
           </div>
           <p style={{fontSize:13,color:theme.textTer,marginTop:8}}>Tap camera to upload photo</p>
@@ -825,7 +860,7 @@ const EditProfilePage=({onBack,currentUser,theme,onUpdate})=>{
         <Inp label="Location" value={location} onChange={setLocation} placeholder="Your city/area" icon="fire" theme={theme}/>
         <Btn onClick={save} full loading={loading} icon="check" theme={theme}>Save Changes</Btn>
       </div>
-      <input ref={fileInputRef} type="file" accept="image/*" style={{display:"none"}}/>
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{display:"none"}}/>
     </div>
   );
 };
@@ -886,8 +921,8 @@ const Profile=({currentUser,onLogout,theme,onThemeChange})=>{
     <div style={{paddingBottom:100}}>
       <div style={{background:`linear-gradient(135deg,${theme.primary},${theme.accent})`,padding:32,borderRadius:"0 0 32px 32px"}}>
         <div style={{textAlign:"center"}}>
-          <div style={{width:96,height:96,borderRadius:"50%",background:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px"}}>
-            {(currentUser.displayName||"U")[0].toUpperCase()}
+          <div style={{width:96,height:96,borderRadius:"50%",background:profile?.photoURL?`url(${profile.photoURL}) center/cover`:"#FFF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,fontWeight:900,color:theme.primary,margin:"0 auto 16px"}}>
+            {!profile?.photoURL&&(currentUser.displayName||"U")[0].toUpperCase()}
           </div>
           <h2 style={{fontSize:24,fontWeight:900,color:"#FFF",marginBottom:8}}>{currentUser.displayName}</h2>
           <p style={{fontSize:15,color:"rgba(255,255,255,0.8)",marginBottom:4}}>{profile?.location||"Location not set"}</p>
@@ -967,11 +1002,11 @@ export default function App(){
   },[]);
   
   const handleMessage=useCallback(user=>{setActiveChat(user);setTab("messages");},[]);
-  const handleViewProfile=useCallback(userId=>{
+  const handleViewProfile=useCallback((userId)=>{
     setTab("profile");
     setTimeout(()=>{
-      const profileComponent=document.querySelector('[data-profile-view]');
-      if(profileComponent)profileComponent.click();
+      const event=new CustomEvent('viewProfile',{detail:{userId}});
+      window.dispatchEvent(event);
     },100);
   },[]);
   
