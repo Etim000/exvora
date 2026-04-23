@@ -139,7 +139,9 @@ const Auth=({onLogin,theme})=>{
         onLogin(cred.user);
       }
     }catch(e){
-      setErr(e.code==="auth/email-already-in-use"?"Email already registered":e.code==="auth/user-not-found"?"No account found":e.code==="auth/wrong-password"||e.code==="auth/invalid-credential"?"Incorrect credentials":"Error occurred");
+  console.log("Auth error:", e);
+  setErr(e.message || "Error occurred");
+}
     }
     setLoading(false);
   };
